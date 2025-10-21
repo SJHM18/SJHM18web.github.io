@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pantalla Principal - Powerlifting IPF</title>
+    <style>
+        body { margin:0; background:#000; color:white; font-family:'Segoe UI',Arial; text-align:center; overflow:hidden; }
+        header { padding:10px 0; background:#202020; color:#0cf; font-size:1.5rem; font-weight:600; }
+        h1 { font-size:3rem; margin:10px 0; color:#0cf; }
+        h2 { font-size:1.6rem; color:#ccc; }
+        #timer { font-size:4rem; color:#ffcc00; margin:20px 0; font-weight:bold; }
+        .lights { display:flex; justify-content:center; gap:50px; margin:30px 0; }
+        .light { width:120px; height:120px; border-radius:50%; background:#222; transition:0.3s; }
+        .white { background:white; box-shadow:0 0 40px #fff; }
+        .red { background:red; box-shadow:0 0 40px red; }
+        #result { font-size:2.5rem; margin-top:20px; }
+        .votes-panel { background: #333; padding: 10px; margin: 10px; border-radius: 10px; }
+        .vote-item { display: inline-block; margin: 5px; padding: 5px 10px; border-radius: 5px; }
+        .vote-valid { background: green; }
+        .vote-invalid { background: red; }
+    </style>
+</head>
+<body>
+
+<header>🏆 Campeonato Municipal de Powerlifting</header>
+
+<h1 id="name">🏋️ Atleta</h1>
+<h2 id="info">Peso: --- | Intento: --- | Categoría: ---</h2>
+<div id="timer">01:00</div>
+
+<div class="lights">
+    <div class="light" id="judge1"></div>
+    <div class="light" id="judge2"></div>
+    <div class="light" id="judge3"></div>
+</div>
+
+<div class="votes-panel">
+    <h3>Votos Registrados:</h3>
+    <div id="votesDisplay"></div>
+</div>
+
+<div id="result">Esperando decisión...</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
+<script>
+    // Misma configuración de Firebase
+    const firebaseConfig = {
+
+  apiKey: "AIzaSyC3IZ88PoBChtP4YwE4ir9kumM5GE81cIk",
+
+  authDomain: "powerliftingdb-1383a.firebaseapp.com",
+
+  databaseURL: "https://powerliftingdb-1383a-default-rtdb.firebaseio.com",
+
+  projectId: "powerliftingdb-1383a",
+
+  storageBucket: "powerliftingdb-1383a.firebasestorage.app",
+
+  messagingSenderId: "127060559535",
+
+  appId: "1:127060559535:web:e7e928afc5d447b16cf65a"
+
+};
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    let currentAttemptId = '';
+    let currentVotes = {};
+
+    // Escuchar cambios en atleta actual
+    database.ref('competition/current').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            document.getElementById("name").textContent = "🏋️ " + data.name;
+            document.getElementById("info").textContent = data.info;
+            currentAttemptId = data.attemptId;
+            resetLights();
+            currentVotes = {};
+            updateVotesDisplay();
+        }
+    });
+
+    // Escuchar votos
+    database.ref('votes').on('value', (snapshot) => {
+        const allVotes = snapshot.val() || {};
+        const currentAttemptVotes = allVotes[currentAttemptId];
+        
+        if (currentAttemptVotes) {
+            currentVotes = currentAttemptVotes;
+            updateLights();
+            updateVotesDisplay();
+            checkResult();
+        }
+    });
+
+    function updateLights() {
+        // Reset todas las luces
+        ['judge1', 'judge2', 'judge3'].forEach(judge => {
+            document.getElementById(judge).className = 'light';
+        });
+
+        // Actualizar luces según votos
+        Object.keys(currentVotes).forEach(judgeKey => {
+            const vote = currentVotes[judgeKey];
+            const judgeNumber = judgeKey.replace('judge', '');
+            const lightElement = document.getElementById(`judge${judgeNumber}`);
+            
+            if (lightElement) {
+                lightElement.className = `light ${vote.decision}`;
+            }
+        });
+    }
+
+    function updateVotesDisplay() {
+        const votesDisplay = document.getElementById('votesDisplay');
+        votesDisplay.innerHTML = '';
+        
+        Object.keys(currentVotes).forEach(judgeKey => {
+            const vote = currentVotes[judgeKey];
+            const voteElement = document.createElement('div');
+            voteElement.className = `vote-item ${vote.decision === 'white' ? 'vote-valid' : 'vote-invalid'}`;
+            voteElement.textContent = `J${judgeKey.replace('judge', '')}: ${vote.decision === 'white' ? 'VÁLIDO' : 'NULO'}`;
+            votesDisplay.appendChild(voteElement);
+        });
+    }
+
+    function checkResult() {
+        const votes = Object.values(currentVotes);
+        const validVotes = votes.filter(vote => vote.decision === 'white').length;
+        const totalJudges = 3;
+        
+        const resultElement = document.getElementById('result');
+        
+        if (votes.length === totalJudges) {
+            if (validVotes >= 2) {
+                resultElement.textContent = "✅ Levantamiento VÁLIDO";
+                resultElement.style.color = "lime";
+            } else {
+                resultElement.textContent = "❌ Levantamiento NULO";
+                resultElement.style.color = "red";
+            }
+        } else {
+            resultElement.textContent = `Esperando votos... (${votes.length}/${totalJudges})`;
+            resultElement.style.color = "orange";
+        }
+    }
+
+    function resetLights() {
+        ['judge1', 'judge2', 'judge3'].forEach(judge => {
+            document.getElementById(judge).className = 'light';
+        });
+        document.getElementById("result").textContent = "Esperando decisión...";
+        document.getElementById("result").style.color = "white";
+        document.getElementById("votesDisplay").innerHTML = '';
+    }
+    
+
+    // Temporizador (mantener tu código existente)
+    let time = 60;
+    let timerInterval;
+    
+    function startTimer() {
+        clearInterval(timerInterval);
+        time = 60;
+        updateTimerDisplay();
+        timerInterval = setInterval(() => {
+            if (time > 0) {
+                time--;
+                updateTimerDisplay();
+            } else {
+                clearInterval(timerInterval);
+                document.getElementById("timer").textContent = "⏰ TIEMPO!";
+                document.getElementById("timer").style.color = "red";
+            }
+        }, 1000);
+    }
+
+    function updateTimerDisplay() {
+        const minutes = Math.floor(time / 60);
+        const seconds = time % 60;
+        document.getElementById("timer").textContent = 
+            `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    // Iniciar temporizador cuando llegue nuevo atleta
+    database.ref('competition/current').on('value', () => {
+        startTimer();
+    });
+</script>
+</body>
+</html>

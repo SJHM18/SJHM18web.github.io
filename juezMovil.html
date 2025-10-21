@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juez - Powerlifting IPF</title>
+    <style>
+        body { 
+            background: #111; 
+            color: white; 
+            font-family: Arial; 
+            text-align: center;
+            padding: 20px;
+        }
+        .judge-card {
+            background: #222;
+            padding: 20px;
+            margin: 10px;
+            border-radius: 10px;
+        }
+        button {
+            padding: 20px;
+            margin: 10px;
+            font-size: 1.5rem;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 90%;
+        }
+        .valid { background: #0080ff; color: white; }
+        .invalid { background: crimson; color: white; }
+        .status { margin: 10px; padding: 10px; border-radius: 5px; }
+        .connected { background: green; }
+        .disconnected { background: red; }
+    </style>
+</head>
+<body>
+    <h1>⚖️ Juez <span id="judgeNumber">1</span></h1>
+    
+    <div class="judge-card">
+        <h2 id="currentAthlete">Atleta: Cargando...</h2>
+        <p id="attemptInfo">Intento: ---</p>
+        
+        <button class="valid" onclick="vote('white')">✅ VÁLIDO</button>
+        <button class="invalid" onclick="vote('red')">❌ NULO</button>
+        
+        <div id="voteStatus" class="status">Esperando voto...</div>
+        <div id="connectionStatus" class="status disconnected">Desconectado</div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+    
+    <script>
+        // Configuración Firebase (OBTENER DE FIREBASE CONSOLE)
+        const firebaseConfig = {
+
+  apiKey: "AIzaSyC3IZ88PoBChtP4YwE4ir9kumM5GE81cIk",
+
+  authDomain: "powerliftingdb-1383a.firebaseapp.com",
+
+  databaseURL: "https://powerliftingdb-1383a-default-rtdb.firebaseio.com",
+
+  projectId: "powerliftingdb-1383a",
+
+  storageBucket: "powerliftingdb-1383a.firebasestorage.app",
+
+  messagingSenderId: "127060559535",
+
+  appId: "1:127060559535:web:e7e928afc5d447b16cf65a"
+
+};
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Obtener número de juez desde URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const judgeId = urlParams.get('judge') || '1';
+        document.getElementById('judgeNumber').textContent = judgeId;
+
+        let currentAttempt = '';
+
+        // Escuchar cambios en la base de datos
+        database.ref('competition/current').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                document.getElementById('currentAthlete').textContent = `Atleta: ${data.name}`;
+                document.getElementById('attemptInfo').textContent = `Intento: ${data.attempt}`;
+                currentAttempt = data.attemptId;
+                
+                // Resetear estado de voto cuando cambia el atleta
+                document.getElementById('voteStatus').textContent = 'Esperando voto...';
+                document.getElementById('voteStatus').style.background = '#333';
+            }
+        });
+
+        // Escuchar estado de conexión
+        database.ref('.info/connected').on('value', (snapshot) => {
+            const connected = snapshot.val();
+            const statusElement = document.getElementById('connectionStatus');
+            if (connected) {
+                statusElement.textContent = 'Conectado ✓';
+                statusElement.className = 'status connected';
+            } else {
+                statusElement.textContent = 'Desconectado ✗';
+                statusElement.className = 'status disconnected';
+            }
+        });
+
+        function vote(decision) {
+            if (!currentAttempt) {
+                alert('No hay intento activo');
+                return;
+            }
+
+            const voteData = {
+                judge: judgeId,
+                decision: decision,
+                timestamp: Date.now(),
+                attemptId: currentAttempt
+            };
+
+            // Guardar voto en Firebase
+            database.ref(`votes/${currentAttempt}/judge${judgeId}`).set(voteData)
+                .then(() => {
+                    document.getElementById('voteStatus').textContent = `Voto registrado: ${decision === 'white' ? 'VÁLIDO' : 'NULO'}`;
+                    document.getElementById('voteStatus').style.background = decision === 'white' ? 'green' : 'red';
+                })
+                .catch((error) => {
+                    alert('Error al registrar voto: ' + error.message);
+                });
+        }
+    </script>
+</body>
+</html>

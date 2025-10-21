@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin - Powerlifting IPF</title>
+    <style>
+        body { background: #111; color: white; font-family: Arial; padding: 20px; }
+        .card { background: #222; padding: 15px; margin: 10px; border-radius: 10px; }
+        input, button { padding: 10px; margin: 5px; border-radius: 5px; }
+        button { background: #0080ff; color: white; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🎮 Panel de Administración</h1>
+    
+    <div class="card">
+        <h3>Nuevo Atleta/Intento</h3>
+        <input id="athleteName" placeholder="Nombre del atleta">
+        <input id="athleteWeight" placeholder="Peso (kg)">
+        <input id="attemptNumber" placeholder="N° Intento" value="1">
+        <input id="athleteCategory" placeholder="Categoría">
+        <button onclick="setCurrentAthlete()">Establecer Atleta Actual</button>
+    </div>
+
+    <div class="card">
+        <h3>Control de Competencia</h3>
+        <button onclick="startTimer()">⏱️ Iniciar Temporizador</button>
+        <button onclick="nextAttempt()">➡️ Siguiente Intento</button>
+        <button onclick="clearVotes()">🗑️ Limpiar Votos</button>
+        <button onclick="clearData()"> limpiarDatos</button>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+
+  apiKey: "AIzaSyC3IZ88PoBChtP4YwE4ir9kumM5GE81cIk",
+
+  authDomain: "powerliftingdb-1383a.firebaseapp.com",
+
+  databaseURL: "https://powerliftingdb-1383a-default-rtdb.firebaseio.com",
+
+  projectId: "powerliftingdb-1383a",
+
+  storageBucket: "powerliftingdb-1383a.firebasestorage.app",
+
+  messagingSenderId: "127060559535",
+
+  appId: "1:127060559535:web:e7e928afc5d447b16cf65a"
+
+};
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        function setCurrentAthlete() {
+            const name = document.getElementById('athleteName').value;
+            const weight = document.getElementById('athleteWeight').value;
+            const attempt = document.getElementById('attemptNumber').value;
+            const category = document.getElementById('athleteCategory').value;
+            
+            const attemptId = `attempt_${Date.now()}`;
+            
+            const athleteData = {
+                name: name,
+                weight: weight,
+                attempt: attempt,
+                category: category,
+                info: `${weight}kg | ${attempt}° intento | ${category}`,
+                attemptId: attemptId
+            };
+
+            database.ref('competition/current').set(athleteData)
+                .then(() => {
+                    alert('Atleta establecido correctamente');
+                })
+                .catch((error) => {
+                    alert('Error: ' + error.message);
+                });
+        }
+
+        function startTimer() {
+            database.ref('competition/timer').set({
+                status: 'started',
+                startTime: Date.now()
+            });
+        }
+
+        function nextAttempt() {
+            // Limpiar votos del intento anterior
+            database.ref('votes').remove();
+            
+            // Preparar para siguiente atleta
+            document.getElementById('athleteName').value = '';
+            document.getElementById('attemptNumber').value = 
+                parseInt(document.getElementById('attemptNumber').value) + 1;
+        }
+
+        function clearVotes() {
+            database.ref('votes').remove()
+                .then(() => {
+                    alert('Votos limpiados');
+                });
+        }
+        function clearData(){
+            database.ref('current').remove()
+                .then(() => {
+                    alert('datos limpiados')
+                });
+        }
+    </script>
+</body>
+</html>
